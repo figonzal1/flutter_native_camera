@@ -44,6 +44,8 @@ class CameraController {
               logger.e("Request permission failed");
             } else {
               logger.i("Request permission granted");
+
+              startCamera();
             }
 
             break;
@@ -58,12 +60,30 @@ class CameraController {
           break;
 
         case CameraState.authorized:
-          logger.i("Request permission granted");
+          logger.i("Request permission authorized");
+          startCamera();
+
           break;
       }
     } on PlatformException catch (error) {
       isStarting = false;
       logger.f("Camera permission exception: $error");
     }
+  }
+
+  Future<void> startCamera() async {
+    //Init camera
+    final Map<String, dynamic> arguments = {};
+    arguments['cameraResolution'] = <int>[
+      cameraResolution!.width.toInt(),
+      cameraResolution!.height.toInt()
+    ];
+
+    var result = await _methodChannel.invokeMapMethod<String, dynamic>(
+      'startCamera',
+      arguments,
+    );
+
+    logger.i("Resultado start camera $result");
   }
 }

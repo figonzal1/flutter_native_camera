@@ -26,16 +26,20 @@ class CameraPlugin : FlutterPlugin, ActivityAware {
     // ACTIVITY AWARE
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
 
-        val binaryMessenger = this.flutterPluginBinding?.binaryMessenger
+        val bMessenger = this.flutterPluginBinding?.binaryMessenger
         val permission = CameraPermission(binding.activity)
+        val tRegistry = this.flutterPluginBinding?.textureRegistry
 
-        cameraHandler = binaryMessenger?.let {
-            CameraHandler(
-                binding.activity,
-                it,
-                permission,
-                binding::addRequestPermissionsResultListener
-            )
+        cameraHandler = bMessenger?.let { binaryMessenger ->
+            tRegistry?.let { textureRegistry ->
+                CameraHandler(
+                    binding.activity,
+                    binaryMessenger,
+                    permission,
+                    binding::addRequestPermissionsResultListener,
+                    textureRegistry
+                )
+            }
         }
 
 

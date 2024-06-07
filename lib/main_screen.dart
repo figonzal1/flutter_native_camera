@@ -16,6 +16,10 @@ class MyHomePage extends StatefulWidget {
 
   final String title;
 
+  //final BoxFit fit;
+
+
+
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
@@ -38,39 +42,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final Size size = MediaQuery.sizeOf(context);
+
+    //final scanWindow = widget.scanWindow;
+
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: <Widget>[
             const Text("Cámara nativa"),
@@ -83,5 +65,86 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
     );
+  }
+
+  /*Widget _buildScanner(Size size, String? webId, int? textureId) {
+    return ClipRect(
+      child: LayoutBuilder(
+        builder: (_, constraints) {
+          return SizedBox.fromSize(
+            size: constraints.biggest,
+            child: FittedBox(
+              fit: widget.fit,
+              child: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: Texture(textureId: textureId!),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }*/
+
+  Rect _calculateScanWindowRelativeToTextureInPercentage(
+    BoxFit fit,
+    Rect scanWindow,
+    Size textureSize,
+    Size widgetSize,
+  ) {
+    double fittedTextureWidth;
+    double fittedTextureHeight;
+
+    switch (fit) {
+      case BoxFit.contain:
+        final widthRatio = widgetSize.width / textureSize.width;
+        final heightRatio = widgetSize.height / textureSize.height;
+        final scale = widthRatio < heightRatio ? widthRatio : heightRatio;
+        fittedTextureWidth = textureSize.width * scale;
+        fittedTextureHeight = textureSize.height * scale;
+        break;
+
+      case BoxFit.cover:
+        final widthRatio = widgetSize.width / textureSize.width;
+        final heightRatio = widgetSize.height / textureSize.height;
+        final scale = widthRatio > heightRatio ? widthRatio : heightRatio;
+        fittedTextureWidth = textureSize.width * scale;
+        fittedTextureHeight = textureSize.height * scale;
+        break;
+
+      case BoxFit.fill:
+        fittedTextureWidth = widgetSize.width;
+        fittedTextureHeight = widgetSize.height;
+        break;
+
+      case BoxFit.fitHeight:
+        final ratio = widgetSize.height / textureSize.height;
+        fittedTextureWidth = textureSize.width * ratio;
+        fittedTextureHeight = widgetSize.height;
+        break;
+
+      case BoxFit.fitWidth:
+        final ratio = widgetSize.width / textureSize.width;
+        fittedTextureWidth = widgetSize.width;
+        fittedTextureHeight = textureSize.height * ratio;
+        break;
+
+      case BoxFit.none:
+      case BoxFit.scaleDown:
+        fittedTextureWidth = textureSize.width;
+        fittedTextureHeight = textureSize.height;
+        break;
+    }
+
+    final offsetX = (widgetSize.width - fittedTextureWidth) / 2;
+    final offsetY = (widgetSize.height - fittedTextureHeight) / 2;
+
+    final left = (scanWindow.left - offsetX) / fittedTextureWidth;
+    final top = (scanWindow.top - offsetY) / fittedTextureHeight;
+    final right = (scanWindow.right - offsetX) / fittedTextureWidth;
+    final bottom = (scanWindow.bottom - offsetY) / fittedTextureHeight;
+
+    return Rect.fromLTRB(left, top, right, bottom);
   }
 }
