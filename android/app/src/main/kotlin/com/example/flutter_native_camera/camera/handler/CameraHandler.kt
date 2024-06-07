@@ -38,6 +38,7 @@ class CameraHandler(
     binaryMessenger: BinaryMessenger,
     private val permission: CameraPermission,
     private val addPermissionListener: (RequestPermissionsResultListener) -> Unit,
+    private val frameCallback: CameraEventHandler,
     private val textureRegistry: TextureRegistry
 
 ) : MethodCallHandler {
@@ -58,6 +59,8 @@ class CameraHandler(
         methodChannel = MethodChannel(binaryMessenger, "cl.ryc/permission")
         methodChannel!!.setMethodCallHandler(this);
     }
+
+
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
 
@@ -235,6 +238,12 @@ class CameraHandler(
                 val rotation = imageProxy.imageInfo.rotationDegrees
                 val imageByteArray = imageProxy.toByteArrayYUV420()
                 if (imageByteArray != null) {
+
+                    val mapEvent = mapOf(
+                        "image" to imageByteArray
+                    )
+                    frameCallback.publishEvent(mapEvent)
+
                     /*if (isReadyToSetup()) {
                         val rectCamera = Rect(0, 0, imageProxy.height, imageProxy.width)
                         val rectMask = convertScanWindowArrayToRect(scanWindow, imageProxy)

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_native_camera/controller/camera_controller.dart';
 import 'package:flutter_native_camera/utils/enum.dart';
@@ -18,14 +21,14 @@ class MyHomePage extends StatefulWidget {
 
   //final BoxFit fit;
 
-
-
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
   late CameraController cameraController;
+
+  StreamSubscription? event;
 
   @override
   void initState() {
@@ -38,6 +41,24 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> startCamera() async {
     await cameraController.start();
+
+    _startScanner();
+  }
+
+  void _startScanner() {
+    /*cameraController.events?.onData((handleData) {
+      var mapData = handleData as Map;
+
+      var byteData = mapData['image'] as List<int>;
+
+      Uint8List uint8list = Uint8List.fromList(byteData);
+
+      //_image = Image.memory(uint8list);
+
+      //logger.d("Main screen event received: ${mapData['image']}");
+
+
+    });*/
   }
 
   @override
@@ -60,6 +81,24 @@ class _MyHomePageState extends State<MyHomePage> {
               onPressed: startCamera,
               color: Theme.of(context).colorScheme.inversePrimary,
               child: const Text("Call nativo"),
+            ),
+            StreamBuilder(
+              stream: cameraController.events,
+              builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+                if (snapshot.hasData) {
+                  var mapData = snapshot.data as Map;
+                  var byteData = mapData['image'] as List<int>;
+
+                  // Convertir la lista de enteros en un Uint8List
+                  Uint8List uint8list = Uint8List.fromList(byteData);
+
+                  // Usar Image.memory para mostrar la imagen
+                  return Image.memory(uint8list);
+                } else {
+                  // Mostrar un indicador de carga mientras la imagen no está disponible
+                  return CircularProgressIndicator();
+                }
+              },
             )
           ],
         ),
@@ -67,14 +106,14 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  /*Widget _buildScanner(Size size, String? webId, int? textureId) {
+  Widget _buildScanner(BoxFit fit, size, int? textureId) {
     return ClipRect(
       child: LayoutBuilder(
         builder: (_, constraints) {
           return SizedBox.fromSize(
             size: constraints.biggest,
             child: FittedBox(
-              fit: widget.fit,
+              fit: fit,
               child: SizedBox(
                 width: size.width,
                 height: size.height,
@@ -85,7 +124,7 @@ class _MyHomePageState extends State<MyHomePage> {
         },
       ),
     );
-  }*/
+  }
 
   Rect _calculateScanWindowRelativeToTextureInPercentage(
     BoxFit fit,

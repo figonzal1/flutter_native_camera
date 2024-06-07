@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_native_camera/utils/enum.dart';
 import 'package:logger/logger.dart';
@@ -13,17 +15,26 @@ class CameraController {
 
   bool isStarting = false;
 
-  static const MethodChannel _methodChannel = MethodChannel(
-      "cl.ryc/permission"); //Nombre del canal debe conincidir con CameraHandler.kt
+  //Nombre del canal debe conincidir con CameraHandler.kt
+  static const MethodChannel _methodChannel =
+      MethodChannel("cl.ryc/permission");
+
+  static const EventChannel _eventChannel = EventChannel("cl.ryc/event");
+
+  StreamSubscription? events;
 
   CameraController({this.cameraResolution, this.facing = CameraFacing.back});
 
   ///Metodo para iniciar camara
-  Future<void> start() async {
+  Future<Map<String, dynamic>?> start() async {
+    Map<String, dynamic>? startResult = {};
+
     if (isStarting) {
       logger.d("Called start() while starting.");
-      return;
+      return null;
     }
+
+    events ??= _eventChannel.receiveBroadcastStream().listen((data) {});
 
     isStarting = true;
 
@@ -45,7 +56,7 @@ class CameraController {
             } else {
               logger.i("Request permission granted");
 
-              startCamera();
+              startResult = await _startCamera();
             }
 
             break;
@@ -61,7 +72,7 @@ class CameraController {
 
         case CameraState.authorized:
           logger.i("Request permission authorized");
-          startCamera();
+          startResult = await _startCamera();
 
           break;
       }
@@ -69,9 +80,11 @@ class CameraController {
       isStarting = false;
       logger.f("Camera permission exception: $error");
     }
+
+    return startResult;
   }
 
-  Future<void> startCamera() async {
+  Future<Map<String, dynamic>?> _startCamera() async {
     //Init camera
     final Map<String, dynamic> arguments = {};
     arguments['cameraResolution'] = <int>[
@@ -85,5 +98,7 @@ class CameraController {
     );
 
     logger.i("Resultado start camera $result");
+
+    return result;
   }
 }

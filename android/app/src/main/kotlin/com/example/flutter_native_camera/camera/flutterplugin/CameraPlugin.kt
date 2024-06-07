@@ -1,5 +1,6 @@
 package com.example.flutter_native_camera.camera.flutterplugin
 
+import com.example.flutter_native_camera.camera.handler.CameraEventHandler
 import com.example.flutter_native_camera.camera.handler.CameraHandler
 import com.example.flutter_native_camera.camera.permission.CameraPermission
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -30,13 +31,18 @@ class CameraPlugin : FlutterPlugin, ActivityAware {
         val permission = CameraPermission(binding.activity)
         val tRegistry = this.flutterPluginBinding?.textureRegistry
 
+
         cameraHandler = bMessenger?.let { binaryMessenger ->
+
+            val cameraEventHandler = CameraEventHandler(bMessenger)
+
             tRegistry?.let { textureRegistry ->
                 CameraHandler(
                     binding.activity,
                     binaryMessenger,
                     permission,
                     binding::addRequestPermissionsResultListener,
+                    cameraEventHandler,
                     textureRegistry
                 )
             }
