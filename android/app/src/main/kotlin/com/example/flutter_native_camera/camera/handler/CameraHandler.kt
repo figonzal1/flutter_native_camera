@@ -3,13 +3,13 @@ package com.example.flutter_native_camera.camera.handler
 import android.app.Activity
 import android.content.Context
 import android.graphics.ImageFormat
-import android.graphics.Rect
 import android.hardware.display.DisplayManager
-import android.hardware.display.DisplayManager.*
-import android.media.Image
+import android.hardware.display.DisplayManager.DisplayListener
 import android.os.Build
 import android.util.Log
+import android.util.Size
 import android.view.Surface
+import android.view.WindowManager
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -18,16 +18,13 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.resolutionselector.ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.QualitySelector.getResolution
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.example.flutter_native_camera.camera.permission.CameraPermission
+import com.example.flutter_native_camera.camera.utils.toByteArrayYUV420
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import android.util.Size
-import android.view.WindowManager
-import com.example.flutter_native_camera.camera.utils.toByteArrayYUV420
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.PluginRegistry.RequestPermissionsResultListener
 import io.flutter.view.TextureRegistry
@@ -66,85 +63,91 @@ class CameraHandler(
 
 
         when (call.method) {
-            "checkPermission" -> {
-                result.success(permission.hasCameraPermission())
-            }
+            "checkPermission" -> result.success(permission.hasCameraPermission())
 
-            "requestPermission" -> {
-                permission.requestPermission(addPermissionListener = addPermissionListener,
-                    object : CameraPermission.ResultCallback {
-                        override fun onResult(errorCode: String?, errorDescription: String?) {
+            "requestPermission" -> permission.requestPermission(addPermissionListener = addPermissionListener,
+                object : CameraPermission.ResultCallback {
+                    override fun onResult(errorCode: String?, errorDescription: String?) {
 
-                            Log.d("REQUEST_PERMISSION", "Result $errorCode - $errorDescription")
+                        Log.d("REQUEST_PERMISSION", "Result $errorCode - $errorDescription")
 
-                            when (errorCode) {
-                                null -> result.success(true)
-                                "CAMERA_ERROR" -> result.success(false)
-                                else -> result.error(errorCode, errorDescription, null)
-                            }
+                        when (errorCode) {
+                            null -> result.success(true)
+                            "CAMERA_ERROR" -> result.success(false)
+                            else -> result.error(errorCode, errorDescription, null)
                         }
                     }
-                )
-            }
+                }
+            )
 
-            "startCamera" -> {
-
-                val cameraResolutionValues: List<Int>? =
-                    call.argument<List<Int>>("cameraResolution")
-                val cameraResolution: Size? =
-                    if (cameraResolutionValues != null) {
-                        Size(
-                            cameraResolutionValues[0],
-                            cameraResolutionValues[1]
-                        )
-                    } else {
-                        null
-                    }
-
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
-                val executor = ContextCompat.getMainExecutor(activity)
-
-                cameraProviderFuture.addListener({
-                    cameraProvider = cameraProviderFuture.get()
-
-                    cameraProvider?.unbindAll()
-                    textureEntry = textureRegistry.createSurfaceTexture()
-
-                    previewBuilder(executor)
-                    analysisBuilder(cameraResolution, executor)
-
-                    try {
-                        camera = cameraProvider?.bindToLifecycle(
-                            activity as LifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            analysis
-                        )
-                    } catch (e: Exception) {
-                        Log.e("CameraX", "Use case binding failed", e)
-                        return@addListener
-                    }
-
-                    val resolution = analysis!!.resolutionInfo!!.resolution
-                    val width = resolution.width.toDouble()
-                    val height = resolution.height.toDouble()
-                    val portrait = (camera?.cameraInfo?.sensorRotationDegrees ?: 0) % 180 == 0
-
-                    result.success(
-                        mapOf(
-                            "textureId" to textureEntry!!.id(),
-                            "size" to mapOf(
-                                "width" to if (portrait) width else height,
-                                "height" to if (portrait) height else width,
-                            )
-                        ),
-                    )
-
-                }, executor)
-            }
+            "startCamera" -> start(call, result)
 
             else -> result.notImplemented()
         }
+    }
+
+    private fun start(
+        call: MethodCall,
+        result: MethodChannel.Result
+    ) {
+        val cameraResolutionValues: List<Int>? =
+            call.argument<List<Int>>("cameraResolution")
+
+        Log.d(
+            "START_CAMERA",
+            "Camera resolution: ${cameraResolutionValues?.get(0)} - ${cameraResolutionValues?.get(1)}"
+        )
+
+        val cameraResolution: Size? =
+            if (cameraResolutionValues != null) {
+                Size(
+                    cameraResolutionValues[0],
+                    cameraResolutionValues[1]
+                )
+            } else {
+                null
+            }
+
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
+        val executor = ContextCompat.getMainExecutor(activity)
+
+        cameraProviderFuture.addListener({
+            cameraProvider = cameraProviderFuture.get()
+
+            cameraProvider?.unbindAll()
+            textureEntry = textureRegistry.createSurfaceTexture()
+
+            previewBuilder(executor)
+            analysisBuilder(cameraResolution, executor)
+
+            try {
+                camera = cameraProvider?.bindToLifecycle(
+                    activity as LifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    analysis
+                )
+            } catch (e: Exception) {
+                Log.e("START_CAMERA", "Use case binding failed", e)
+                return@addListener
+            }
+
+            val resolution = analysis!!.resolutionInfo!!.resolution
+            val width = resolution.width.toDouble()
+            val height = resolution.height.toDouble()
+            val portrait = (camera?.cameraInfo?.sensorRotationDegrees ?: 0) % 180 == 0
+
+            result.success(
+                mapOf(
+                    "textureId" to textureEntry!!.id(),
+                    "size" to mapOf(
+                        "width" to if (portrait) width else height,
+                        "height" to if (portrait) height else width,
+                    )
+                ),
+            )
+
+        }, executor)
     }
 
     private fun analysisBuilder(
