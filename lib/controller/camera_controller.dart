@@ -42,9 +42,8 @@ class CameraController {
     }
 
     _events ??= _eventChannel.receiveBroadcastStream().listen((data) {
-      logger.i("Data: $data");
+      //logger.i("Data: $data");
       var image = data['image'];
-
       _livenessController.add(image);
     });
 
@@ -104,13 +103,27 @@ class CameraController {
       cameraResolution!.height.toInt()
     ];
 
-    var result = await _methodChannel.invokeMapMethod<String, dynamic>(
+    Map<String, dynamic>? startResult = {};
+
+    startResult = await _methodChannel.invokeMapMethod<String, dynamic>(
       'startCamera',
       arguments,
     );
 
-    logger.i("Resultado start camera $result");
-    return startArguments.value = result;
+    logger.i("Resultado start camera $startResult");
+
+    final Map<Object?, Object?>? sizeInfo =
+        startResult!['size'] as Map<Object?, Object?>?;
+
+    final Size size = Size(
+      sizeInfo?['width'] as double? ?? 0,
+      sizeInfo?['height'] as double? ?? 0,
+    );
+
+    return startArguments.value = {
+      'textureId': startResult['textureId'] as int,
+      'size': size
+    };
   }
 
   void dispose() {

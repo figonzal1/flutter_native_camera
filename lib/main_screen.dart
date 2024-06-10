@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_native_camera/controller/camera_controller.dart';
 import 'package:flutter_native_camera/utils/enum.dart';
+import 'package:path_provider/path_provider.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -29,6 +32,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late CameraController cameraController;
 
+  StreamSubscription? imageSubscription;
+
   int? _textureId;
   double? width;
   double? height;
@@ -49,12 +54,12 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       if (map != null) {
         _textureId = map['textureId'];
-        width = map['size']['width'];
-        height = map['size']['height'];
+        width = map['size'].width;
+        height = map['size'].height;
       }
     });
 
-    _startScanner();
+    //_startScanner();
   }
 
   void _startScanner() {
@@ -83,7 +88,31 @@ class _MyHomePageState extends State<MyHomePage> {
               child: const Text("Call nativo"),
             ),
             _textureId != null
-                ? Expanded(child: _valueListener())
+                ? Expanded(
+                    child: StreamBuilder(
+                    stream: cameraController.liveness,
+                    builder: (BuildContext context, AsyncSnapshot snapshot) {
+                      logger.w("Stream builder data ${snapshot.data}");
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Text('Cargando...');
+                      } else if (snapshot.hasError) {
+                        return Text('Error: ${snapshot.error}');
+                      } else {
+                        // Aquí es donde procesarías y renderizarías el nuevo frame.
+                        // Por ejemplo, podrías convertir los bytes en una imagen y mostrarla en un widget Image.
+                        // Este es solo un ejemplo y necesitarás adaptarlo a tus necesidades.
+
+                        Uint8List bytes = Uint8List.fromList(snapshot.data);
+
+                        _saveImage(bytes);
+                        return Image(
+                          image: MemoryImage(bytes),
+                          fit: BoxFit.cover,
+                        );
+                      }
+                    },
+                  ))
                 : const Text("Textura nula")
           ],
         ),
@@ -119,6 +148,24 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _saveImage(Uint8List bytes) async {
+    try {
+      // Obtener la ruta al directorio temporal del dispositivo.
+      final directory = await getTemporaryDirectory();
+      final path = directory.path;
+
+      // Crear un archivo en la ruta.
+      final file = File('$path/image.jpg');
+
+      // Escribir los bytes en el archivo.
+      await file.writeAsBytes(bytes);
+
+      print('Imagen guardada en $path');
+    } catch (e) {
+      print('Error al guardar la imagen: $e');
+    }
   }
 
   Rect _calculateScanWindowRelativeToTextureInPercentage(

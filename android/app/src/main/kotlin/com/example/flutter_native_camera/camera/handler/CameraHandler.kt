@@ -246,15 +246,17 @@ class CameraHandler(
     private val captureOutput = ImageAnalysis.Analyzer { imageProxy -> // YUV_420_888 format
         coroutineScope.launch {
 
-            val buffer = imageProxy.planes[0].buffer
-            val data = buffer.toByteArray()
+            //val buffer = imageProxy.planes[0].buffer
+            //val data = buffer.toByteArray()
+            val data = imageProxy.toByteArrayYUV420()
 
+            if (data != null) {
+                val mapEvent = mapOf(
+                    "image" to data
+                )
 
-            val mapEvent = mapOf(
-                "image" to data
-            )
-            cameraEventHandler.publishEvent(mapEvent)
-
+                cameraEventHandler.publishEvent(mapEvent)
+            }
             imageProxy.close()
 
 
