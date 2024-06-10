@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_native_camera/controller/camera_controller.dart';
 import 'package:flutter_native_camera/utils/enum.dart';
 
@@ -28,7 +29,9 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late CameraController cameraController;
 
-  StreamSubscription? event;
+  int? _textureId;
+  double? width;
+  double? height;
 
   @override
   void initState() {
@@ -40,31 +43,28 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> startCamera() async {
-    await cameraController.start();
+    Map<String, dynamic>? map = await cameraController.start();
+
+    logger.d("MAP: $map");
+    setState(() {
+      if (map != null) {
+        _textureId = map['textureId'];
+        width = map['size']['width'];
+        height = map['size']['height'];
+      }
+    });
 
     _startScanner();
   }
 
   void _startScanner() {
-    /*cameraController.events?.onData((handleData) {
-      var mapData = handleData as Map;
-
-      var byteData = mapData['image'] as List<int>;
-
-      Uint8List uint8list = Uint8List.fromList(byteData);
-
-      //_image = Image.memory(uint8list);
-
-      //logger.d("Main screen event received: ${mapData['image']}");
-
-
-    });*/
+    cameraController.liveness.listen((data) {
+      logger.f("Data in flutter UI: $data");
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final Size size = MediaQuery.sizeOf(context);
-
     //final scanWindow = widget.scanWindow;
 
     return Scaffold(
@@ -74,7 +74,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: <Widget>[
             const Text("Cámara nativa"),
             MaterialButton(
@@ -82,46 +82,41 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Theme.of(context).colorScheme.inversePrimary,
               child: const Text("Call nativo"),
             ),
-            StreamBuilder(
-              stream: cameraController.events,
-              builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-                if (snapshot.hasData) {
-                  var mapData = snapshot.data as Map;
-                  var byteData = mapData['image'] as List<int>;
-
-                  // Convertir la lista de enteros en un Uint8List
-                  Uint8List uint8list = Uint8List.fromList(byteData);
-
-                  // Usar Image.memory para mostrar la imagen
-                  return Image.memory(uint8list);
-                } else {
-                  // Mostrar un indicador de carga mientras la imagen no está disponible
-                  return CircularProgressIndicator();
-                }
-              },
-            )
+            _textureId != null
+                ? Expanded(child: _valueListener())
+                : const Text("Textura nula")
           ],
         ),
       ),
     );
   }
 
-  Widget _buildScanner(BoxFit fit, size, int? textureId) {
+  Widget _valueListener() {
+    return ValueListenableBuilder(
+        valueListenable: cameraController.startArguments,
+        builder: (context, value, child) {
+          logger.e("VALUE LISTENER: ${value['size']}");
+
+          if (value == null) {
+            return Text("Error");
+          }
+          return _buildScanner(
+              Size(value['size']['width'], value['size']['height']),
+              BoxFit.contain,
+              value['textureId']);
+        });
+  }
+
+  Widget _buildScanner(Size size, BoxFit fit, int? textureId) {
+    logger.f("Texture ID: $textureId");
     return ClipRect(
-      child: LayoutBuilder(
-        builder: (_, constraints) {
-          return SizedBox.fromSize(
-            size: constraints.biggest,
-            child: FittedBox(
-              fit: fit,
-              child: SizedBox(
-                width: size.width,
-                height: size.height,
-                child: Texture(textureId: textureId!),
-              ),
-            ),
-          );
-        },
+      child: FittedBox(
+        fit: fit,
+        child: SizedBox(
+          width: size.width,
+          height: size.height,
+          child: Texture(textureId: textureId!),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_camera/utils/enum.dart';
 import 'package:logger/logger.dart';
@@ -21,7 +22,13 @@ class CameraController {
 
   static const EventChannel _eventChannel = EventChannel("cl.ryc/event");
 
-  StreamSubscription? events;
+  /// Sets the face liveness stream
+  final StreamController _livenessController = StreamController.broadcast();
+  Stream<dynamic> get liveness => _livenessController.stream;
+  StreamSubscription? _events;
+
+  /// A notifier that provides several arguments about the FaceLivenessDetection
+  final ValueNotifier startArguments = ValueNotifier(null);
 
   CameraController({this.cameraResolution, this.facing = CameraFacing.back});
 
@@ -34,7 +41,12 @@ class CameraController {
       return null;
     }
 
-    events ??= _eventChannel.receiveBroadcastStream().listen((data) {});
+    _events ??= _eventChannel.receiveBroadcastStream().listen((data) {
+      logger.i("Data: $data");
+      var image = data['image'];
+
+      _livenessController.add(image);
+    });
 
     isStarting = true;
 
@@ -98,7 +110,11 @@ class CameraController {
     );
 
     logger.i("Resultado start camera $result");
+    return startArguments.value = result;
+  }
 
-    return result;
+  void dispose() {
+    _events?.cancel();
+    _livenessController.close();
   }
 }

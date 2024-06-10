@@ -13,6 +13,7 @@ import android.view.WindowManager
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
@@ -22,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.example.flutter_native_camera.camera.permission.CameraPermission
 import com.example.flutter_native_camera.camera.utils.toByteArrayYUV420
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -31,6 +33,7 @@ import io.flutter.view.TextureRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 
 class CameraHandler(
@@ -38,7 +41,7 @@ class CameraHandler(
     binaryMessenger: BinaryMessenger,
     private val permission: CameraPermission,
     private val addPermissionListener: (RequestPermissionsResultListener) -> Unit,
-    private val frameCallback: CameraEventHandler,
+    private val cameraEventHandler: CameraEventHandler,
     private val textureRegistry: TextureRegistry
 
 ) : MethodCallHandler {
@@ -59,7 +62,6 @@ class CameraHandler(
         methodChannel = MethodChannel(binaryMessenger, "cl.ryc/permission")
         methodChannel!!.setMethodCallHandler(this);
     }
-
 
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -189,8 +191,10 @@ class CameraHandler(
             }
         }
 
-        analysis =
-            analysisBuilder.build().apply { setAnalyzer(executor, captureOutput) }
+        analysis = analysisBuilder.build()
+            .also {
+                it.setAnalyzer(executor, captureOutput)
+            }
     }
 
     private fun previewBuilder(executor: Executor) {
@@ -207,7 +211,7 @@ class CameraHandler(
 
         // Build the preview to be shown on the Flutter texture
         val previewBuilder = Preview.Builder()
-        preview = previewBuilder.build().apply { setSurfaceProvider(surfaceProvider) }
+        preview = previewBuilder.build().also { it.setSurfaceProvider(surfaceProvider) }
     }
 
     private fun getResolution(cameraResolution: Size): Size {
@@ -232,17 +236,41 @@ class CameraHandler(
         return targetResolution
     }
 
-    val captureOutput = ImageAnalysis.Analyzer { imageProxy -> // YUV_420_888 format
+    private fun ByteBuffer.toByteArray(): ByteArray {
+        rewind()    // Rewind the buffer to zero
+        val data = ByteArray(remaining())
+        get(data)   // Copy the buffer into a byte array
+        return data // Return the byte array
+    }
+
+    private val captureOutput = ImageAnalysis.Analyzer { imageProxy -> // YUV_420_888 format
         coroutineScope.launch {
-            if (imageProxy.format == ImageFormat.YUV_420_888) {
-                val rotation = imageProxy.imageInfo.rotationDegrees
+
+            val buffer = imageProxy.planes[0].buffer
+            val data = buffer.toByteArray()
+
+
+            val mapEvent = mapOf(
+                "image" to data
+            )
+            cameraEventHandler.publishEvent(mapEvent)
+
+            imageProxy.close()
+
+
+            /*if (imageProxy.format == ImageFormat.YUV_420_888) {
+
+                //val rotation = imageProxy.imageInfo.rotationDegrees
+
                 val imageByteArray = imageProxy.toByteArrayYUV420()
                 if (imageByteArray != null) {
 
                     val mapEvent = mapOf(
                         "image" to imageByteArray
                     )
-                    frameCallback.publishEvent(mapEvent)
+
+                    Log.d("CAPTURE_OUTPUT", imageByteArray.toList().toString())
+                    cameraEventHandler.publishEvent(mapEvent)
 
                     /*if (isReadyToSetup()) {
                         val rectCamera = Rect(0, 0, imageProxy.height, imageProxy.width)
@@ -254,7 +282,19 @@ class CameraHandler(
                     }*/
                 }
                 imageProxy.close()
-            }
+            }*/
         }
+    }
+
+    fun dispose(activityPluginBinding: ActivityPluginBinding) {
+        methodChannel?.setMethodCallHandler(null)
+        methodChannel = null
+
+        val listener: RequestPermissionsResultListener? = permission.getPermissionListener()
+
+        if (listener != null) {
+            activityPluginBinding.removeRequestPermissionsResultListener(listener)
+        }
+
     }
 }

@@ -61,7 +61,9 @@ class CameraPlugin : FlutterPlugin, ActivityAware {
     }
 
     override fun onDetachedFromActivity() {
-        cameraHandler = null;
+        cameraHandler?.dispose(this.activityPluginBinding!!)
+        cameraHandler = null
+        activityPluginBinding = null
     }
 
 }
