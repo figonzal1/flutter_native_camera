@@ -2,7 +2,6 @@ package com.example.flutter_native_camera.camera.handler
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.ImageFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.DisplayManager.DisplayListener
 import android.os.Build
@@ -13,7 +12,6 @@ import android.view.WindowManager
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
@@ -30,9 +28,12 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.PluginRegistry.RequestPermissionsResultListener
 import io.flutter.view.TextureRegistry
+import io.flutter.view.TextureRegistry.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 
@@ -49,7 +50,7 @@ class CameraHandler(
     private var methodChannel: MethodChannel? = null
 
     private var cameraProvider: ProcessCameraProvider? = null
-    private var textureEntry: TextureRegistry.SurfaceTextureEntry? = null
+    private var textureEntry: SurfaceTextureEntry? = null
     private var preview: Preview? = null
     private var analysis: ImageAnalysis? = null
     private var camera: Camera? = null
@@ -200,12 +201,12 @@ class CameraHandler(
     private fun previewBuilder(executor: Executor) {
         val surfaceProvider = Preview.SurfaceProvider { request ->
 
-            val texture = textureEntry?.surfaceTexture()
-            texture?.setDefaultBufferSize(
+            val surfaceTexture = textureEntry?.surfaceTexture()
+            surfaceTexture?.setDefaultBufferSize(
                 request.resolution.width, request.resolution.height
             )
 
-            val surface = Surface(texture)
+            val surface = Surface(surfaceTexture)
             request.provideSurface(surface, executor) {}
         }
 
@@ -243,6 +244,18 @@ class CameraHandler(
         return data // Return the byte array
     }
 
+    private fun saveImageToExternalStorage(imageByteArray: ByteArray, context: Context): File {
+
+        val outputDir = context.cacheDir
+        val outputFile = File.createTempFile("prefix", ".jpg", outputDir)
+
+        FileOutputStream(outputFile).use { stream ->
+            stream.write(imageByteArray)
+        }
+        println("Image saved at: ${outputFile.absolutePath}")
+        return outputFile
+    }
+
     private val captureOutput = ImageAnalysis.Analyzer { imageProxy -> // YUV_420_888 format
         coroutineScope.launch {
 
@@ -251,6 +264,9 @@ class CameraHandler(
             val data = imageProxy.toByteArrayYUV420()
 
             if (data != null) {
+
+                //saveImageToExternalStorage(data, activity.applicationContext)
+
                 val mapEvent = mapOf(
                     "image" to data
                 )

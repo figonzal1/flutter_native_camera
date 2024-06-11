@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -38,6 +39,8 @@ class _MyHomePageState extends State<MyHomePage> {
   double? width;
   double? height;
 
+  Queue<List<int>> queue = Queue<List<int>>();
+
   @override
   void initState() {
     // TODO: implement initState
@@ -59,12 +62,16 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     });
 
-    //_startScanner();
+    _startScanner();
   }
 
   void _startScanner() {
-    cameraController.liveness.listen((data) {
-      logger.f("Data in flutter UI: $data");
+    cameraController.liveness.listen((data) async {
+      /*queue.add(data);
+
+      if (queue.isNotEmpty) {
+        _saveImage(queue.removeFirst());
+      }*/
     });
   }
 
@@ -87,33 +94,10 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Theme.of(context).colorScheme.inversePrimary,
               child: const Text("Call nativo"),
             ),
-            _textureId != null
-                ? Expanded(
-                    child: StreamBuilder(
-                    stream: cameraController.liveness,
-                    builder: (BuildContext context, AsyncSnapshot snapshot) {
-                      logger.w("Stream builder data ${snapshot.data}");
-
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Text('Cargando...');
-                      } else if (snapshot.hasError) {
-                        return Text('Error: ${snapshot.error}');
-                      } else {
-                        // Aquí es donde procesarías y renderizarías el nuevo frame.
-                        // Por ejemplo, podrías convertir los bytes en una imagen y mostrarla en un widget Image.
-                        // Este es solo un ejemplo y necesitarás adaptarlo a tus necesidades.
-
-                        Uint8List bytes = Uint8List.fromList(snapshot.data);
-
-                        _saveImage(bytes);
-                        return Image(
-                          image: MemoryImage(bytes),
-                          fit: BoxFit.cover,
-                        );
-                      }
-                    },
-                  ))
-                : const Text("Textura nula")
+            _textureId == null && width == null && height == null
+                ? const CircularProgressIndicator()
+                : _buildScanner(
+                    Size(width!, height!), BoxFit.contain, _textureId)
           ],
         ),
       ),
@@ -129,10 +113,8 @@ class _MyHomePageState extends State<MyHomePage> {
           if (value == null) {
             return Text("Error");
           }
-          return _buildScanner(
-              Size(value['size']['width'], value['size']['height']),
-              BoxFit.contain,
-              value['textureId']);
+          return _buildScanner(Size(value['size'].width, value['size'].height),
+              BoxFit.contain, value['textureId']);
         });
   }
 
@@ -150,14 +132,14 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Future<void> _saveImage(Uint8List bytes) async {
+  void _saveImage(List<int> bytes) async {
     try {
       // Obtener la ruta al directorio temporal del dispositivo.
       final directory = await getTemporaryDirectory();
       final path = directory.path;
 
       // Crear un archivo en la ruta.
-      final file = File('$path/image.jpg');
+      final file = File('$path/${DateTime.now()}.jpg');
 
       // Escribir los bytes en el archivo.
       await file.writeAsBytes(bytes);
@@ -168,64 +150,5 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Rect _calculateScanWindowRelativeToTextureInPercentage(
-    BoxFit fit,
-    Rect scanWindow,
-    Size textureSize,
-    Size widgetSize,
-  ) {
-    double fittedTextureWidth;
-    double fittedTextureHeight;
-
-    switch (fit) {
-      case BoxFit.contain:
-        final widthRatio = widgetSize.width / textureSize.width;
-        final heightRatio = widgetSize.height / textureSize.height;
-        final scale = widthRatio < heightRatio ? widthRatio : heightRatio;
-        fittedTextureWidth = textureSize.width * scale;
-        fittedTextureHeight = textureSize.height * scale;
-        break;
-
-      case BoxFit.cover:
-        final widthRatio = widgetSize.width / textureSize.width;
-        final heightRatio = widgetSize.height / textureSize.height;
-        final scale = widthRatio > heightRatio ? widthRatio : heightRatio;
-        fittedTextureWidth = textureSize.width * scale;
-        fittedTextureHeight = textureSize.height * scale;
-        break;
-
-      case BoxFit.fill:
-        fittedTextureWidth = widgetSize.width;
-        fittedTextureHeight = widgetSize.height;
-        break;
-
-      case BoxFit.fitHeight:
-        final ratio = widgetSize.height / textureSize.height;
-        fittedTextureWidth = textureSize.width * ratio;
-        fittedTextureHeight = widgetSize.height;
-        break;
-
-      case BoxFit.fitWidth:
-        final ratio = widgetSize.width / textureSize.width;
-        fittedTextureWidth = widgetSize.width;
-        fittedTextureHeight = textureSize.height * ratio;
-        break;
-
-      case BoxFit.none:
-      case BoxFit.scaleDown:
-        fittedTextureWidth = textureSize.width;
-        fittedTextureHeight = textureSize.height;
-        break;
-    }
-
-    final offsetX = (widgetSize.width - fittedTextureWidth) / 2;
-    final offsetY = (widgetSize.height - fittedTextureHeight) / 2;
-
-    final left = (scanWindow.left - offsetX) / fittedTextureWidth;
-    final top = (scanWindow.top - offsetY) / fittedTextureHeight;
-    final right = (scanWindow.right - offsetX) / fittedTextureWidth;
-    final bottom = (scanWindow.bottom - offsetY) / fittedTextureHeight;
-
-    return Rect.fromLTRB(left, top, right, bottom);
-  }
+  
 }
