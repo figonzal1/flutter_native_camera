@@ -283,7 +283,7 @@ class CameraHandler(
                         if (shouldProcessImage()) {
                             val mapEvent = mapOf("image" to data)
 
-                            delay(200)
+                            delay(30)
                             cameraEventHandler.publishEvent(mapEvent)
                         }
                     }

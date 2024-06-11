@@ -36,7 +36,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   StreamSubscription? imageSubscription;
 
-  Uint8List? _imageData;
+  static ValueNotifier<Uint8List?> imageNotifier =
+      ValueNotifier<Uint8List?>(null);
 
   int? _textureId;
   double? width;
@@ -71,9 +72,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _startScanner() {
     cameraController.liveness.listen((data) async {
       logger.i("DATA UI:  $data");
-      setState(() {
-        _imageData = data;
-      });
+      imageNotifier.value = data;
       /*queue.add(data);
 
       if (queue.isNotEmpty) {
@@ -101,9 +100,14 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Theme.of(context).colorScheme.inversePrimary,
               child: const Text("Call nativo"),
             ),
-            _imageData == null
-                ? const Center(child: CircularProgressIndicator())
-                : Image.memory(_imageData!)
+            ValueListenableBuilder<Uint8List?>(
+              valueListenable: imageNotifier,
+              builder: (context, imageData, child) {
+                return imageData == null
+                    ? const Text('No image data')
+                    : Image.memory(imageData, gaplessPlayback: true);
+              },
+            ),
           ],
         ),
       ),
