@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_native_camera/controller/camera_controller.dart';
 import 'package:flutter_native_camera/utils/enum.dart';
@@ -34,6 +35,8 @@ class _MyHomePageState extends State<MyHomePage> {
   late CameraController cameraController;
 
   StreamSubscription? imageSubscription;
+
+  Uint8List? _imageData;
 
   int? _textureId;
   double? width;
@@ -67,6 +70,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _startScanner() {
     cameraController.liveness.listen((data) async {
+      logger.i("DATA UI:  $data");
+      setState(() {
+        _imageData = data;
+      });
       /*queue.add(data);
 
       if (queue.isNotEmpty) {
@@ -94,10 +101,9 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Theme.of(context).colorScheme.inversePrimary,
               child: const Text("Call nativo"),
             ),
-            _textureId == null && width == null && height == null
-                ? const CircularProgressIndicator()
-                : _buildScanner(
-                    Size(width!, height!), BoxFit.contain, _textureId)
+            _imageData == null
+                ? const Center(child: CircularProgressIndicator())
+                : Image.memory(_imageData!)
           ],
         ),
       ),
@@ -149,6 +155,4 @@ class _MyHomePageState extends State<MyHomePage> {
       print('Error al guardar la imagen: $e');
     }
   }
-
-  
 }

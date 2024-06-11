@@ -1,7 +1,11 @@
 package com.example.flutter_native_camera.camera.handler
 
+import android.R.attr
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.DisplayManager.DisplayListener
 import android.os.Build
@@ -9,9 +13,12 @@ import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.WindowManager
+import androidx.annotation.OptIn
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
@@ -28,14 +35,19 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.PluginRegistry.RequestPermissionsResultListener
 import io.flutter.view.TextureRegistry
-import io.flutter.view.TextureRegistry.*
+import io.flutter.view.TextureRegistry.SurfaceTextureEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
+
 
 class CameraHandler(
     private val activity: Activity,
@@ -156,6 +168,7 @@ class CameraHandler(
         }, executor)
     }
 
+    @OptIn(ExperimentalGetImage::class)
     private fun analysisBuilder(
         cameraResolution: Size?,
         executor: Executor
@@ -256,52 +269,36 @@ class CameraHandler(
         return outputFile
     }
 
+    @ExperimentalGetImage
     private val captureOutput = ImageAnalysis.Analyzer { imageProxy -> // YUV_420_888 format
         coroutineScope.launch {
 
-            //val buffer = imageProxy.planes[0].buffer
-            //val data = buffer.toByteArray()
-            val data = imageProxy.toByteArrayYUV420()
+            val image = imageProxy.image
+            if (image != null) {
+                if (image.format == ImageFormat.YUV_420_888) {
 
-            if (data != null) {
+                    val data = imageProxy.toByteArrayYUV420()
 
-                //saveImageToExternalStorage(data, activity.applicationContext)
+                    if (data != null) {
+                        if (shouldProcessImage()) {
+                            val mapEvent = mapOf("image" to data)
 
-                val mapEvent = mapOf(
-                    "image" to data
-                )
+                            delay(200)
+                            cameraEventHandler.publishEvent(mapEvent)
+                        }
+                    }
 
-                cameraEventHandler.publishEvent(mapEvent)
+
+                }
             }
             imageProxy.close()
-
-
-            /*if (imageProxy.format == ImageFormat.YUV_420_888) {
-
-                //val rotation = imageProxy.imageInfo.rotationDegrees
-
-                val imageByteArray = imageProxy.toByteArrayYUV420()
-                if (imageByteArray != null) {
-
-                    val mapEvent = mapOf(
-                        "image" to imageByteArray
-                    )
-
-                    Log.d("CAPTURE_OUTPUT", imageByteArray.toList().toString())
-                    cameraEventHandler.publishEvent(mapEvent)
-
-                    /*if (isReadyToSetup()) {
-                        val rectCamera = Rect(0, 0, imageProxy.height, imageProxy.width)
-                        val rectMask = convertScanWindowArrayToRect(scanWindow, imageProxy)
-                        setUpLivenessSDK(rectCamera, rectMask)
-                        isStarted = true
-                    } else if (isReadyToProcess()) {
-                        // TODO: Add your ML processing here
-                    }*/
-                }
-                imageProxy.close()
-            }*/
         }
+    }
+
+    private var frameCount = 0
+    private fun shouldProcessImage(): Boolean {
+        frameCount++
+        return frameCount % 5 == 0 // Procesar solo una de cada 5 imágenes.
     }
 
     fun dispose(activityPluginBinding: ActivityPluginBinding) {
